@@ -1,6 +1,7 @@
 from __future__ import annotations
 import typing as ta
 import random
+import json
 
 import openai
 
@@ -56,7 +57,29 @@ SYSTEM_PROMPT = """
 You are a person who is talking to another person.
 You are {name}, {identity}.
 You are talking to {other_name}.
+You currently think that {other_name} is {other_identity}. And you feel {affect} about them.
 """
+
+INTERPRET_CONVERSATION_PROMPT = """
+You just finished the conversation with {other_name}.
+The conversation went like this:
+{conversation}
+You previously thought that {other_name} was {other_identity}. And you felt {affect} about them.
+What do you think now?
+Respond in JSON format with the following two keys:
+<identity>: <NEW IDENTITY>,
+<affect>: <NEW AFFECT>
+"""
+
+
+def get_chat_response(messages):
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=messages,
+        temperature=0.7,
+        max_tokens=200
+    )
+    return response.choices[0].message["content"]
 
 
 class Conversation:
@@ -67,7 +90,7 @@ class Conversation:
         self.person_b_messages = []
 
     def append_message(self, message: str, from_person: "Person"):
-        if message == "":
+        if not message:
             return
         if from_person == self.person_a:
             self.person_a_messages.append(message)
@@ -75,7 +98,16 @@ class Conversation:
             self.person_b_messages.append(message)
         else:
             raise ValueError("Invalid person")
-        
+
+    def as_string_messages(self):
+        messages = []
+        for i in range(max(len(self.person_a_messages), len(self.person_b_messages))):
+            if i < len(self.person_a_messages):
+                messages.append(f"{self.person_a.name}: {self.person_a_messages[i]}")
+            if i < len(self.person_b_messages):
+                messages.append(f"{self.person_b.name}: {self.person_b_messages[i]}")
+        return "\n".join(messages)
+
     def to_chat_messages(self):
         messages = []
         for i in range(max(len(self.person_a_messages), len(self.person_b_messages))):
@@ -83,6 +115,8 @@ class Conversation:
                 messages.append({"role": "assistant", "content": self.person_a_messages[i]})
             if i < len(self.person_b_messages):
                 messages.append({"role": "user", "content": self.person_b_messages[i]})
+        if not messages:
+            messages.append({"role": "user", "content": "What do you say to them?"})
         return messages
 
 
@@ -104,36 +138,59 @@ class Person:
     def get_message(self, other_said: str, other: Person) -> str:
         conversation = self.get_conversation(other)
         conversation.append_message(other_said, other)
+
+        current_relationship = self.relationships.get(other, Relationship(other))
         system_message = {"role": "system", "content": SYSTEM_PROMPT.format(
             name=self.name,
             identity=self.identity,
             other_name=other.name,
+            other_identity=current_relationship.target_identity,
+            affect=current_relationship.affect
         )}
         chat_messages = conversation.to_chat_messages()
         messages_to_send = [system_message] + chat_messages
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=messages_to_send,
-            temperature=0.7,
-            max_tokens=200
-        )
-        return response.choices[0].message["content"]
+        return get_chat_response(messages_to_send)
     
     def end_conversation(self):
         other = self.current_conversation.person_b
         self.relationships[other].conversation_history.append(self.current_conversation)
-        self.interpret_conversation(self.current_conversation)
+        self.interpret_conversation(self.current_conversation, self.relationships[other])
         self.current_conversation = None
 
-    def interpret_conversation(self, conversation: Conversation):
-        pass
+    def interpret_conversation(self, conversation: Conversation, relationship: Relationship):
+        system_message = {"role": "system", "content": SYSTEM_PROMPT.format(
+            name=self.name,
+            identity=self.identity,
+            other_name=conversation.person_b.name,
+            other_identity=relationship.target_identity,
+            affect=relationship.affect
+        )}
+        
+        user_prompt = INTERPRET_CONVERSATION_PROMPT.format(
+            other_name=conversation.person_b.name,
+            other_identity=relationship.target_identity,
+            affect=relationship.affect,
+            conversation=conversation.as_string_messages()
+        )
+        messages_to_send = [system_message] + [{
+            "role": "user",
+            "content": user_prompt
+        }]
+        response = get_chat_response(messages_to_send)
+        json_response = json.loads(response)
+        new_identity = json_response["identity"]
+        new_affect = json_response["affect"]
+        relationship.target_identity = new_identity
+        relationship.affect = new_affect
+        print(f"Person {self.name} think {relationship.target.name} is {new_identity} and feels {new_affect} about them.")
+        return
 
 
 class Relationship:
     def __init__(self, target: Person) -> None:
         self.target = target
-        self.target_identity = ""  # What I think about you
-        self.affect = ""           # How I feel about you
+        self.target_identity = "Currently unknown"  # What I think about you
+        self.affect = "Neutral"                     # How I feel about you
 
         self.conversation_history: ta.List[Conversation] = []
 

@@ -4,6 +4,7 @@ import time
 
 from person import Person
 
+PAUSE_TIME = 0.5
 
 
 def two_people_talk(person_a: Person, person_b: Person, max_number_of_messages_per_person: int = 3):
@@ -12,9 +13,9 @@ def two_people_talk(person_a: Person, person_b: Person, max_number_of_messages_p
         person_a_message = person_a.get_message(person_b_message, person_b)
         person_b_message = person_b.get_message(person_a_message, person_a)
         print(f"{person_a.name} says: {person_a_message}")
-        time.sleep(0.3)
+        time.sleep(PAUSE_TIME)
         print(f"{person_b.name} says: {person_b_message}")
-        time.sleep(0.3)
+        time.sleep(PAUSE_TIME)
 
     person_a.end_conversation()
     person_b.end_conversation()
