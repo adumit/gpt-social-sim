@@ -7,16 +7,16 @@ import openai
 
 # Below are verbose descriptions of a person's identity in a few sentences
 IDENTITIES = [
-    "a hardworking single mother who dedicates most of her time to her two children. In her spare time, she enjoys painting landscapes and taking nature walks. You are is passionate about environmental conservation and dreams of one day opening her own art gallery.",
-    "a young software engineer who loves to explore new technologies and programming languages. He is a talented musician, playing the guitar and piano in a local band. You are volunteers at a local animal shelter, where he helps care for abandoned pets.",
-    "a talented chef who runs her own restaurant, specializing in fusion cuisine. She loves to travel the world, sampling various cultures and incorporating their flavors into her cooking. You are also an advocate for sustainable agriculture and sources her ingredients from local organic farms.",
-    "a professional athlete, playing soccer for a renowned team. He is passionate about fitness and spends hours in the gym, perfecting his skills. You are a role model for young athletes and actively participates in charity events to raise funds for underprivileged children.",
-    "a compassionate nurse who works long hours to provide care and comfort to her patients. She is an avid reader and loves to unwind with a good book after a long day. You are also a talented baker, often bringing her homemade treats to share with her colleagues.",
-    "a successful entrepreneur who has built a tech startup from the ground up. He is deeply interested in artificial intelligence and its potential to revolutionize various industries. You enjoys mentoring young entrepreneurs and sharing his experiences with others.",
-    "a dedicated high school teacher who is passionate about helping her students reach their full potential. She spends her free time volunteering at a local community center, teaching adult literacy courses. You love exploring the outdoors and going on long hikes with her dog.",
-    "an accomplished architect, designing sustainable and innovative buildings around the world. He is a history enthusiast and enjoys visiting historical sites and museums during his travels. You are an amateur photographer and often captures stunning images of the places he visits.",
-    "a talented dancer who performs with a prestigious ballet company. She is dedicated to her craft and spends hours perfecting her technique. You are passionate about animal welfare and supports various organizations that work towards the protection and conservation of wildlife.",
-    "a gifted scientist, working on cutting-edge research in the field of renewable energy. He enjoys sharing his knowledge and frequently gives lectures at universities and conferences. You are a nature lover and spends his weekends birdwatching and participating in local conservation efforts.",
+    "A dragonborn paladin who was once a soldier in a war but left to pursue a more righteous path. They are fiercely loyal to their friends and have a strong sense of justice, always seeking to protect the innocent and punish the guilty.",
+    "A tiefling rogue who grew up on the streets and learned to survive by pickpocketing and hustling. They have a talent for deception and often use their charm to get out of sticky situations.",
+    "A half-elf bard who was raised by a troupe of traveling performers and has a deep appreciation for music and storytelling. They use their charisma and magical abilities to entertain crowds and sway people to their side.",
+    "A human sorcerer who comes from a long line of powerful magic users. They are arrogant and often look down on those who do not have magical abilities, but they are fiercely protective of their family and friends.",
+    "A dwarf cleric who worships a god of craftsmanship and takes great pride in their work. They are gruff and no-nonsense but have a heart of gold and will go to great lengths to help those in need.",
+    "An elf ranger who has spent their life in the wilderness, hunting game and tracking their prey. They have a deep connection to nature and often speak with animals to gain information or assistance.",
+    "A halfling monk who was raised in a monastery and has devoted their life to the pursuit of physical and spiritual perfection. They are disciplined and reserved, but their martial arts skills are unparalleled.",
+    "A goblin wizard who was cast out from their tribe for being too intelligent and curious. They have since dedicated their life to the study of arcane magic and seek to uncover the secrets of the universe.",
+    "A half-orc barbarian who was once a feared warrior in their tribe but has since left to explore the wider world. They have a quick temper and a love of battle, but they also have a strong sense of honor and loyalty.",
+    "A gnome artificer who specializes in creating mechanical devices and gadgets. They have a childlike curiosity and a boundless imagination, but they are also highly skilled and innovative in their craft.",
 ]
 
 NAMES = [
@@ -51,13 +51,21 @@ NAMES = [
     "Brennan",
 ]
 
+GOALS = [
+    "we should loot the jewelry from the dead person even if it's dangerous",
+    "we should bury the person without removing any of their personal objects",
+    "we should flee as fast as possible, there may be enemies about"
+]
+
 # TODO: Add in affect and what you think the other person's identity is.
 # TODO: Add in goal
 SYSTEM_PROMPT = """
 You are a person who is talking to another person.
+Do not write in second person. Act as though you are the person. Do not write a story.
 You are {name}, {identity}.
 You are talking to {other_name}.
 You currently think that {other_name} is {other_identity}. And you feel {affect} about them.
+Your goal is {goal}. You are trying to convince the others in the group to go along with your goal.
 """
 
 INTERPRET_CONVERSATION_PROMPT = """
@@ -121,12 +129,13 @@ class Conversation:
 
 
 class Person:
-    def __init__(self) -> None:
+    def __init__(self, goal: str = None) -> None:
         # TODO: Add in goals
         self.name = random.choice(NAMES)
         self.identity = random.choice(IDENTITIES)
         self.relationships: ta.Dict["Person", "Relationship"]  = {}
         self.current_conversation: ta.Optional[Conversation] = None
+        self.goal = goal if goal else random.choice(GOALS)
 
     def get_conversation(self, other: Person) -> Conversation:
         if other not in self.relationships:
@@ -145,7 +154,8 @@ class Person:
             identity=self.identity,
             other_name=other.name,
             other_identity=current_relationship.target_identity,
-            affect=current_relationship.affect
+            affect=current_relationship.affect,
+            goal=self.goal
         )}
         chat_messages = conversation.to_chat_messages()
         messages_to_send = [system_message] + chat_messages
@@ -163,7 +173,8 @@ class Person:
             identity=self.identity,
             other_name=conversation.person_b.name,
             other_identity=relationship.target_identity,
-            affect=relationship.affect
+            affect=relationship.affect,
+            goal=self.goal
         )}
         
         user_prompt = INTERPRET_CONVERSATION_PROMPT.format(

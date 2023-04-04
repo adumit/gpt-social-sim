@@ -2,7 +2,7 @@ import typing as ta
 import random
 import time
 
-from person import Person
+from person import Person, GOALS
 
 PAUSE_TIME = 0.5
 
@@ -24,12 +24,12 @@ def two_people_talk(person_a: Person, person_b: Person, max_number_of_messages_p
 
 def run_sim(number_of_people: int = 3):
     people: ta.List[Person] = [
-        Person()  # TODO: Initialize with goals
-        for _ in range(number_of_people)
+        Person(goal=GOALS[i])
+        for i in range(number_of_people)
     ]
     
     for person in people:
-        print(f"{person.name} {person.identity}")
+        print(f"{person.name} {person.identity}, {person.goal}")
 
     print("Starting conversations...\n\n")
 
